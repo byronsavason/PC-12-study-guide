@@ -638,16 +638,6 @@
     color: #fff;
     animation: pulse 1s infinite;
   }
-
-  .audio-status {
-    font-family: var(--font-mono);
-    font-size: 0.67rem;
-    color: var(--text-dim);
-    font-style: italic;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
   }
 
@@ -704,8 +694,6 @@
       <div class="ref-tag" id="studyRef"></div>
       <div class="audio-bar">
         <button class="audio-btn speak" onclick="speakQuestion('studyQuestion')" title="Read question aloud">&#9654; Read Question</button>
-        <button class="audio-btn mic" id="studyMicBtn" onclick="toggleMic('studyInput', 'studyMicBtn', 'studyAudioStatus')" title="Speak your answer">&#9679; Speak Answer</button>
-        <span class="audio-status" id="studyAudioStatus"></span>
       </div>
       <div class="answer-area">
         <textarea class="answer-input" id="studyInput" placeholder="Type or speak your answer, then click Show Answer to compare..." rows="3"></textarea>
@@ -740,8 +728,6 @@
           <div class="ref-tag" id="fcRef" style="margin-top:16px"></div>
           <div class="audio-bar" style="margin-top:16px;" onclick="event.stopPropagation()">
             <button class="audio-btn speak" onclick="speakQuestion('fcQuestion')" title="Read question aloud">&#9654; Read Question</button>
-            <button class="audio-btn mic" id="fcMicBtn" onclick="toggleMic('fcSpeechInput', 'fcMicBtn', 'fcAudioStatus')" title="Speak your answer">&#9679; Speak Answer</button>
-            <span class="audio-status" id="fcAudioStatus"></span>
           </div>
           <input type="hidden" id="fcSpeechInput">
         </div>
@@ -776,8 +762,6 @@
       <div class="ref-tag" id="quizRef"></div>
       <div class="audio-bar">
         <button class="audio-btn speak" onclick="speakQuestion('quizQuestion')" title="Read question aloud">&#9654; Read Question</button>
-        <button class="audio-btn mic" id="quizMicBtn" onclick="toggleMic('quizInput', 'quizMicBtn', 'quizAudioStatus')" title="Speak your answer">&#9679; Speak Answer</button>
-        <span class="audio-status" id="quizAudioStatus"></span>
       </div>
       <div class="answer-area">
         <textarea class="answer-input" id="quizInput" placeholder="Type or speak your answer, then click Show Answer to compare..." rows="3"></textarea>
@@ -1116,10 +1100,6 @@ function browseGo(i) {
 
 function nextQ() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
-  if (isRecording) stopMic(
-    mode === 'study' ? 'studyMicBtn' : mode === 'quiz' ? 'quizMicBtn' : 'fcMicBtn',
-    mode === 'study' ? 'studyAudioStatus' : mode === 'quiz' ? 'quizAudioStatus' : 'fcAudioStatus'
-  );
   if (currentIdx < filteredQs.length - 1) {
     currentIdx++;
     revealed = false;
@@ -1132,10 +1112,6 @@ function nextQ() {
 
 function prevQ() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
-  if (isRecording) stopMic(
-    mode === 'study' ? 'studyMicBtn' : mode === 'quiz' ? 'quizMicBtn' : 'fcMicBtn',
-    mode === 'study' ? 'studyAudioStatus' : mode === 'quiz' ? 'quizAudioStatus' : 'fcAudioStatus'
-  );
   if (currentIdx > 0) {
     currentIdx--;
     revealed = false;
@@ -1232,83 +1208,6 @@ function speakQuestion(elementId) {
   window.speechSynthesis.speak(currentUtterance);
 }
 
-// ── Speech: Speech-to-Text ──
-var activeRecognition = null;
-var isRecording = false;
-
-function toggleMic(targetId, btnId, statusId) {
-  if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-    document.getElementById(statusId).textContent = 'Speech recognition not supported in this browser. Try Chrome.';
-    return;
-  }
-  if (isRecording) {
-    stopMic(btnId, statusId);
-    return;
-  }
-  startMic(targetId, btnId, statusId);
-}
-
-function startMic(targetId, btnId, statusId) {
-  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  activeRecognition = new SpeechRecognition();
-  activeRecognition.continuous = true;
-  activeRecognition.interimResults = true;
-  activeRecognition.lang = 'en-US';
-
-  isRecording = true;
-  var btn = document.getElementById(btnId);
-  btn.classList.add('recording');
-  btn.textContent = 'Stop Recording';
-  document.getElementById(statusId).textContent = 'Listening...';
-
-  var finalTranscript = '';
-
-  activeRecognition.onresult = function(event) {
-    var interim = '';
-    for (var i = event.resultIndex; i < event.results.length; i++) {
-      if (event.results[i].isFinal) {
-        finalTranscript += event.results[i][0].transcript + ' ';
-      } else {
-        interim += event.results[i][0].transcript;
-      }
-    }
-    var target = document.getElementById(targetId);
-    if (target.tagName === 'TEXTAREA') {
-      target.value = finalTranscript + interim;
-    } else {
-      target.value = finalTranscript + interim;
-    }
-    document.getElementById(statusId).textContent = interim ? 'Hearing: ' + interim : 'Listening...';
-  };
-
-  activeRecognition.onerror = function(event) {
-    document.getElementById(statusId).textContent = 'Error: ' + event.error + '. Try again.';
-    stopMic(btnId, statusId);
-  };
-
-  activeRecognition.onend = function() {
-    if (isRecording) {
-      document.getElementById(statusId).textContent = finalTranscript ? 'Done. Review your answer above.' : 'No speech detected.';
-      stopMic(btnId, statusId);
-    }
-  };
-
-  activeRecognition.start();
-}
-
-function stopMic(btnId, statusId) {
-  isRecording = false;
-  if (activeRecognition) {
-    activeRecognition.stop();
-    activeRecognition = null;
-  }
-  var btn = document.getElementById(btnId);
-  btn.classList.remove('recording');
-  btn.innerHTML = '&#9679; Speak Answer';
-  if (document.getElementById(statusId).textContent === 'Listening...') {
-    document.getElementById(statusId).textContent = '';
-  }
-}
 
 init();
 </script>
